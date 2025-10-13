@@ -172,12 +172,15 @@
 </div>
 
 <script>
-  // Базовый URL бэкенда: читаем из VITE_API_URL (Cloudflare Pages → Environment variables),
-  // иначе используем относительные пути на тот же хост.
-  const BASE_URL = (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_API_URL)
-    ? String(import.meta.env.VITE_API_URL).replace(/\/+$/, '')
-    : '';
+  // ======== НАСТРОЙКА АВТОМАТИЧЕСКОГО ПОДКЛЮЧЕНИЯ К БЭКЕНДУ ========
+  // Если фронт развёрнут отдельно (например, на Render Pages), нужно явно указать API URL.
+  // Например: const BASE_URL = "https://smartword-backend.onrender.com";
+  // Иначе — берём текущий origin.
+  const BASE_URL = window.location.origin.includes('render.com')
+    ? 'https://referatai.onrender.com'  // 👉 замени на свой адрес бэкенда Render
+    : window.location.origin;
 
+  // ======== ЭЛЕМЕНТЫ UI ========
   const docTypeEl = document.getElementById('docType');
   docTypeEl.addEventListener('change', () => {
     document.getElementById('labFields').style.display = docTypeEl.value === 'lab' ? '' : 'none';
@@ -191,6 +194,7 @@
   function setError(t){ document.getElementById('error').textContent = t || '' }
   function setSuccess(t){ document.getElementById('success').textContent = t || '' }
 
+  // ======== СБОР МЕТАДАННЫХ ДЛЯ ЛАБОРАТОРНОЙ ========
   function collectLabMeta(){
     if (document.getElementById('docType').value !== 'lab') return null;
     return {
@@ -201,10 +205,12 @@
     };
   }
 
+  // ======== ГЕНЕРАЦИЯ ДОКУМЕНТА ========
   async function generate(){
     setError(''); setSuccess('');
     const topic = document.getElementById('topic').value.trim();
     if (!topic){ setError('Укажите тему'); return; }
+
     const body = {
       topic,
       doc_type: document.getElementById('docType').value,
@@ -216,30 +222,39 @@
       model: (document.getElementById('model').value.trim() || null),
       page_target: parseInt(document.getElementById('pages').value || '8', 10)
     };
+
     uiLock(true); setStatus('Генерация…');
-    try{
+
+    try {
       const r = await fetch(`${BASE_URL}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      if (!r.ok){ throw new Error(await r.text() || 'Ошибка запроса'); }
+
+      if (!r.ok) throw new Error(await r.text() || 'Ошибка запроса к серверу');
+
       const data = await r.json();
-      window.generatedEssay = data.essay || null;
+      if (!data.essay) throw new Error('Сервер не вернул текст документа');
+
+      window.generatedEssay = data.essay;
       renderEssay(data.essay);
       setSuccess('Готово');
-    } catch(e){
-      setError(String(e.message || e));
+    } catch(e) {
+      setError('Ошибка: ' + String(e.message || e));
+      console.error(e);
     } finally {
       uiLock(false); setStatus('');
     }
   }
 
+  // ======== ВИЗУАЛИЗАЦИЯ РЕЗУЛЬТАТА ========
   function renderEssay(root){
     const container = document.getElementById('result');
     container.innerHTML = '';
     if (!root){ container.textContent = 'Нет данных'; return; }
-    const card = document.createElement('div'); card.className = 'card';
+    const card = document.createElement('div');
+    card.className = 'card';
     addSection(card, root, 1);
     container.appendChild(card);
   }
@@ -255,9 +270,11 @@
     (sec.subsections || []).forEach(sub=> addSection(parent, sub, level+1));
   }
 
+  // ======== ЭКСПОРТ В DOCX ========
   async function exportDocx(){
     setError(''); setSuccess('');
     if (!window.generatedEssay){ setError('Сначала сгенерируйте документ'); return; }
+
     const body = {
       topic: document.getElementById('topic').value.trim(),
       essay: window.generatedEssay,
@@ -269,30 +286,40 @@
       doc_type: document.getElementById('docType').value,
       page_target: parseInt(document.getElementById('pages').value || '8', 10)
     };
+
     uiLock(true); setStatus('Экспорт DOCX…');
-    try{
+
+    try {
       const r = await fetch(`${BASE_URL}/export-docx`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      if (!r.ok){ throw new Error(await r.text() || 'Ошибка экспорта'); }
+
+      if (!r.ok) throw new Error(await r.text() || 'Ошибка при экспорте');
+
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = `${body.doc_type || 'document'}.docx`;
-      document.body.appendChild(a); a.click(); a.remove();
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${body.doc_type || 'document'}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
       URL.revokeObjectURL(url);
       setSuccess('DOCX сохранён');
-    } catch(e){
-      setError(String(e.message || e));
+    } catch(e) {
+      setError('Ошибка: ' + String(e.message || e));
+      console.error(e);
     } finally {
       uiLock(false); setStatus('');
     }
   }
 
-  // init
+  // ======== ИНИЦИАЛИЗАЦИЯ ========
   document.getElementById('labFields').style.display = docTypeEl.value === 'lab' ? '' : 'none';
   uiLock(false);
 </script>
+
 </body>
 </html>
