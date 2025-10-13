@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>SmartWord — реферат, статья, лаб. работа</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --bg:#0f172a; --panel:#111827; --muted:#94a3b8; --fg:#e2e8f0; --accent:#22c55e; --border:#1f2937; --danger:#ef4444; }
+    *{ box-sizing:border-box }
+    body{ margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:linear-gradient(160deg,#020617 0%,#0b1020 100%); color:var(--fg) }
+    header{ padding:20px; border-bottom:1px solid var(--border); background:rgba(2,6,23,.6); backdrop-filter:blur(6px); position:sticky; top:0; z-index:10 }
+    .container{ max-width:1100px; margin:0 auto; padding:20px }
+    .grid{ display:grid; grid-template-columns:360px 1fr; gap:20px }
+    @media (max-width:980px){ .grid{ grid-template-columns:1fr } }
+    .panel{ background:linear-gradient(180deg,rgba(17,24,39,.7),rgba(17,24,39,.5)); border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.25) }
+    h1{ margin:0; font-size:20px }
+    .muted{ color:var(--muted); font-size:13px }
+    label{ display:block; margin:12px 0 6px; font-weight:600 }
+    input[type="text"], input[type="number"], select, textarea{
+      width:100%; padding:10px 12px; border-radius:10px; background:#0b1220; border:1px solid var(--border); color:var(--fg); outline:none
+    }
+    textarea{ min-height:90px; resize:vertical }
+    .row{ display:grid; grid-template-columns:1fr 1fr; gap:10px }
+    .row-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px }
+    .actions{ display:flex; gap:10px; margin-top:16px; flex-wrap:wrap }
+    button{ padding:10px 14px; border-radius:10px; border:1px solid var(--border); background:#0b1220; color:var(--fg); cursor:pointer }
+    button.primary{ background:linear-gradient(90deg,#16a34a,#22c55e); border:none; color:#06130a }
+    button.secondary{ background:#0b1220 }
+    button:disabled{ opacity:.6; cursor:not-allowed }
+    .result-section h2{ margin:8px 0 10px; font-size:18px }
+    .card{ background:linear-gradient(180deg,rgba(11,16,32,.9),rgba(11,16,32,.6)); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:12px }
+    .section-title{ font-weight:700; margin:10px 0 6px }
+    .error{ color:var(--danger); margin-top:10px; white-space:pre-wrap }
+    .success{ color:var(--accent); margin-top:10px }
+    .tiny{ font-size:12px; color:var(--muted) }
+    .divider{ height:1px; background:var(--border); margin:12px 0 }
+  </style>
+</head>
+<body>
+<header>
+  <div class="container">
+    <h1>SmartWord — генератор документов</h1>
+    <div class="muted">Типы: реферат, статья, лабораторная.</div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="grid">
+    <div class="panel">
+      <label for="docType">Тип документа</label>
+      <select id="docType">
+        <option value="referat" selected>Реферат</option>
+        <option value="article_ru">Статья (RU)</option>
+        <option value="article_en">Статья (EN)</option>
+        <option value="article_ru_en">Статья (RU/EN)</option>
+        <option value="lab">Лабораторная работа</option>
+      </select>
+
+      <label for="topic">Тема</label>
+      <input id="topic" type="text" placeholder="Например: Методы машинного обучения" />
+
+      <div class="row">
+        <div>
+          <label for="pages">Страниц</label>
+          <input id="pages" type="number" min="1" max="40" value="8" />
+        </div>
+        <div>
+          <label for="outlineDepth">Глубина структуры</label>
+          <select id="outlineDepth">
+            <option value="1">Только разделы</option>
+            <option value="2" selected>Разделы и подразделы</option>
+            <option value="3">До подпунктов</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="style">Стиль</label>
+          <select id="style">
+            <option value="academic" selected>Академический</option>
+            <option value="concise">Краткий</option>
+            <option value="explanatory">Объяснительный</option>
+          </select>
+        </div>
+        <div>
+          <label for="locale">Язык</label>
+          <select id="locale">
+            <option value="ru" selected>Русский</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="model">Модель (опц.)</label>
+          <input id="model" type="text" placeholder="meta-llama/llama-3.1-70b-instruct" />
+        </div>
+        <div>
+          <label for="includeToc">Оглавление</label>
+          <select id="includeToc">
+            <option value="true" selected>Включить</option>
+            <option value="false">Не включать</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <label for="requirements">Требования и примечания (опц.)</label>
+      <textarea id="requirements" placeholder="Напр.: объем 8–12 стр., добавить примеры, сослаться на ГОСТ..."></textarea>
+
+      <div id="labFields" style="display:none">
+        <div class="divider"></div>
+        <label for="labDiscipline">Дисциплина (лаб.)</label>
+        <input id="labDiscipline" type="text" placeholder="Напр.: Информатика" />
+        <label for="labVariant">Вариант/№ работы (лаб.)</label>
+        <input id="labVariant" type="text" placeholder="Напр.: №3" />
+        <label for="labGoal">Цель работы (лаб.)</label>
+        <input id="labGoal" type="text" placeholder="Четко сформулируйте цель" />
+        <label for="labEquipment">Оборудование/ПО (лаб.)</label>
+        <input id="labEquipment" type="text" placeholder="Напр.: Python 3.11, NumPy, Jupyter" />
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row-3">
+        <div>
+          <label for="fontName">Шрифт</label>
+          <select id="fontName">
+            <option value="Times New Roman" selected>Times New Roman</option>
+            <option value="Arial">Arial</option>
+            <option value="Calibri">Calibri</option>
+          </select>
+        </div>
+        <div>
+          <label for="fontSize">Кегль</label>
+          <input id="fontSize" type="number" min="10" max="16" value="12" />
+        </div>
+        <div>
+          <label for="lineSpacing">Межстрочный</label>
+          <select id="lineSpacing">
+            <option value="1.15" selected>1.15</option>
+            <option value="1.5">1.5</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="margins">Поля (см)</label>
+          <input id="margins" type="number" step="0.5" min="1" max="3" value="2.0" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="genBtn" class="primary" type="button" onclick="generate()">Сгенерировать</button>
+        <button id="exportBtn" class="secondary" type="button" onclick="exportDocx()">Экспорт DOCX</button>
+      </div>
+
+      <div id="status" class="tiny"></div>
+      <div id="error" class="error"></div>
+      <div id="success" class="success"></div>
+    </div>
+
+    <div class="panel result-section">
+      <h2>Предпросмотр</h2>
+      <div id="result"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const docTypeEl = document.getElementById('docType');
+  docTypeEl.addEventListener('change', () => {
+    document.getElementById('labFields').style.display = docTypeEl.value === 'lab' ? '' : 'none';
+  });
+
+  function uiLock(lock){
+    document.getElementById('genBtn').disabled = lock;
+    document.getElementById('exportBtn').disabled = lock || !window.generatedEssay;
+  }
+  function setStatus(t){ document.getElementById('status').textContent = t || '' }
+  function setError(t){ document.getElementById('error').textContent = t || '' }
+  function setSuccess(t){ document.getElementById('success').textContent = t || '' }
+
+  function collectLabMeta(){
+    if (document.getElementById('docType').value !== 'lab') return null;
+    return {
+      discipline: document.getElementById('labDiscipline').value.trim() || null,
+      variant: document.getElementById('labVariant').value.trim() || null,
+      goal: document.getElementById('labGoal').value.trim() || null,
+      equipment: document.getElementById('labEquipment').value.trim() || null,
+    };
+  }
+
+  async function generate(){
+    setError(''); setSuccess('');
+    const topic = document.getElementById('topic').value.trim();
+    if (!topic){ setError('Укажите тему'); return; }
+    const body = {
+      topic,
+      doc_type: document.getElementById('docType').value,
+      locale: document.getElementById('locale').value,
+      style: document.getElementById('style').value,
+      outline_depth: parseInt(document.getElementById('outlineDepth').value || '2', 10),
+      requirements: document.getElementById('requirements').value.trim() || null,
+      lab_meta: collectLabMeta(),
+      model: (document.getElementById('model').value.trim() || null),
+      page_target: parseInt(document.getElementById('pages').value || '8', 10)
+    };
+    uiLock(true); setStatus('Генерация…');
+    try{
+      const r = await fetch('/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!r.ok){ throw new Error(await r.text() || 'Ошибка запроса'); }
+      const data = await r.json();
+      window.generatedEssay = data.essay || null;
+      renderEssay(data.essay);
+      setSuccess('Готово');
+    } catch(e){
+      setError(String(e.message || e));
+    } finally {
+      uiLock(false); setStatus('');
+    }
+  }
+
+  function renderEssay(root){
+    const container = document.getElementById('result');
+    container.innerHTML = '';
+    if (!root){ container.textContent = 'Нет данных'; return; }
+    const card = document.createElement('div'); card.className = 'card';
+    addSection(card, root, 1);
+    container.appendChild(card);
+  }
+
+  function addSection(parent, sec, level){
+    const t = document.createElement('div');
+    t.className = 'section-title';
+    t.textContent = sec.title || `Раздел ${level}`;
+    parent.appendChild(t);
+    (sec.paragraphs || []).forEach(p=>{
+      const el = document.createElement('p'); el.textContent = p; parent.appendChild(el);
+    });
+    (sec.subsections || []).forEach(sub=> addSection(parent, sub, level+1));
+  }
+
+  async function exportDocx(){
+    setError(''); setSuccess('');
+    if (!window.generatedEssay){ setError('Сначала сгенерируйте документ'); return; }
+    const body = {
+      topic: document.getElementById('topic').value.trim(),
+      essay: window.generatedEssay,
+      include_toc: document.getElementById('includeToc').value === 'true',
+      line_spacing: parseFloat(document.getElementById('lineSpacing').value || '1.15'),
+      font_name: document.getElementById('fontName').value,
+      font_size_pt: parseInt(document.getElementById('fontSize').value || '12', 10),
+      margins_cm: parseFloat(document.getElementById('margins').value || '2.0'),
+      doc_type: document.getElementById('docType').value,
+      page_target: parseInt(document.getElementById('pages').value || '8', 10)
+    };
+    uiLock(true); setStatus('Экспорт DOCX…');
+    try{
+      const r = await fetch('/export-docx', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!r.ok){ throw new Error(await r.text() || 'Ошибка экспорта'); }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `${body.doc_type || 'document'}.docx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      setSuccess('DOCX сохранён');
+    } catch(e){
+      setError(String(e.message || e));
+    } finally {
+      uiLock(false); setStatus('');
+    }
+  }
+
+  // init
+  document.getElementById('labFields').style.display = docTypeEl.value === 'lab' ? '' : 'none';
+  uiLock(false);
+</script>
+</body>
+</html>
