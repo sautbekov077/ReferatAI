@@ -172,6 +172,12 @@
 </div>
 
 <script>
+  // Базовый URL бэкенда: читаем из VITE_API_URL (Cloudflare Pages → Environment variables),
+  // иначе используем относительные пути на тот же хост.
+  const BASE_URL = (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_API_URL)
+    ? String(import.meta.env.VITE_API_URL).replace(/\/+$/, '')
+    : '';
+
   const docTypeEl = document.getElementById('docType');
   docTypeEl.addEventListener('change', () => {
     document.getElementById('labFields').style.display = docTypeEl.value === 'lab' ? '' : 'none';
@@ -212,7 +218,7 @@
     };
     uiLock(true); setStatus('Генерация…');
     try{
-      const r = await fetch('/generate', {
+      const r = await fetch(`${BASE_URL}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -265,7 +271,7 @@
     };
     uiLock(true); setStatus('Экспорт DOCX…');
     try{
-      const r = await fetch('/export-docx', {
+      const r = await fetch(`${BASE_URL}/export-docx`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
