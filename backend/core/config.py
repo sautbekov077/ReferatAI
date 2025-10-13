@@ -1,5 +1,9 @@
 from pydantic_settings import BaseSettings
 
+CORS_ALLOW_ORIGINS = [
+    o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", "").split(",") if o.strip()
+]
+
 class Settings(BaseSettings):
     OPENROUTER_API_KEY: str
     OPENROUTER_BASE: str = "https://openrouter.ai/api/v1"
@@ -10,3 +14,4 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 settings = Settings()
+
