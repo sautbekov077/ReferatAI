@@ -1,79 +1,72 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from backend.models.schemas import GenerateRequest, GenerateResponse, ExportDocxRequest
-from backend.core.prompts import build_prompt
-from backend.core.parser import parse_essay
-from backend.core.docx_builder import build_docx
-from backend.services.openrouter import chat_complete
-import asyncio
 import os
-import traceback
 
-app = FastAPI(title="DocGen Local")
+from schemas import GenerateRequest, ExportDocxRequest
+from docx_builder import build_docx_bytes
+from parser import to_outline
+from openrouter import generate_essay
+
+app = FastAPI(title="ReferatAI Backend", version="1.0.0")
+
+# CORS: список разрешённых источников берётся из ENV:
+# CORS_ALLOW_ORIGINS="https://your-pages.pages.dev,https://your-domain.com"
+cors_origins_env = os.getenv("CORS_ALLOW_ORIGINS", "")
+allow_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=allow_origins if allow_origins else [],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
+    max_age=86400,
 )
 
-FRONTEND_DIR = os.path.join(os.getcwd(), "frontend")
-if os.path.isdir(FRONTEND_DIR):
-    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
-
-@app.get("/", response_class=HTMLResponse)
-async def index():
-    index_path = os.path.join(FRONTEND_DIR, "index.html")
-    if not os.path.exists(index_path):
-        return HTMLResponse("<h1>DocGen Local</h1><p>frontend/referat.html не найден.</p>", status_code=200)
-    with open(index_path, "r", encoding="utf-8") as f:
-        return f.read()
-
-_gen_lock = asyncio.Lock()
-
-@app.post("/generate", response_model=GenerateResponse)
+@app.post("/generate")
 async def generate(req: GenerateRequest):
-    async with _gen_lock:
-        try:
-            ls = 1.5 if req.page_target >= 6 else 1.15
-            prompt = build_prompt(
-                doc_type=req.doc_type,
-                topic=req.topic,
-                locale=req.locale,
-                style=req.style,
-                depth=req.outline_depth,
-                requirements=req.requirements,
-                lab_meta=req.lab_meta,
-                page_target=req.page_target,
-                line_spacing=ls,
-                font_size=12,
-            )
-            text = await chat_complete(prompt, req.model or None)
-            essay = parse_essay(text)
-            return GenerateResponse(essay=essay)
-        except ValueError as e:
-            raise HTTPException(502, f"Ответ модели не JSON: {e}")
-        except Exception as e:
-            traceback.print_exc()
-            raise HTTPException(502, f"Ошибка генерации: {e}")
+    try:
+        essay = await generate_essay(
+            topic=req.topic,
+            doc_type=req.doc_type,
+            locale=req.locale,
+            style=req.style,
+            outline_depth=req.outline_depth,
+            requirements=req.requirements,
+            lab_meta=req.lab_meta,
+            model=req.model,
+            page_target=req.page_target,
+        )
+        outline = to_outline(essay)
+        return {"essay": outline}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/export-docx")
 async def export_docx(req: ExportDocxRequest):
     try:
-        path = build_docx(req)
-        if not os.path.exists(path):
-            raise HTTPException(500, "DOCX не создан")
-        return FileResponse(
-            path,
-            filename=os.path.basename(path),
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        docx_bytes = build_docx_bytes(
+            topic=req.topic,
+            essay=req.essay,
+            include_toc=req.include_toc,
+            line_spacing=req.line_spacing,
+            font_name=req.font_name,
+            font_size_pt=req.font_size_pt,
+            margins_cm=req.margins_cm,
+            doc_type=req.doc_type,
+            page_target=req.page_target,
+        )
+        filename = f"{req.doc_type or 'document'}.docx"
+        headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+        return Response(
+            content=docx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers=headers,
         )
     except HTTPException:
         raise
     except Exception as e:
-        traceback.print_exc()
-        return JSONResponse({"detail": f"DOCX error: {e}"}, status_code=500)
+        raise HTTPException(status_code=500, detail=str(e))
