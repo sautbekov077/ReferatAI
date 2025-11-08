@@ -172,11 +172,8 @@
 </div>
 
 <script>
-  // Базовый URL бэкенда: читаем из VITE_API_URL (Cloudflare Pages → Environment variables),
-  // иначе используем относительные пути на тот же хост.
-  const BASE_URL = (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_API_URL)
-    ? String(import.meta.env.VITE_API_URL).replace(/\/+$/, '')
-    : '';
+  // Указываем адрес бэкенда на Render (жёстко)
+  const BASE_URL = "https://your-backend.onrender.com"; // ← замени
 
   const docTypeEl = document.getElementById('docType');
   docTypeEl.addEventListener('change', () => {
@@ -290,9 +287,9 @@
     }
   }
 
-  // init
   document.getElementById('labFields').style.display = docTypeEl.value === 'lab' ? '' : 'none';
   uiLock(false);
 </script>
+
 </body>
 </html>
